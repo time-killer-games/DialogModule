@@ -216,50 +216,56 @@ bool WaitForChildPidOfPidToExist(pid_t pid, pid_t ppid) {
   return (pid != ppid);
 }
 
-void modify_dialog() {
-  SetErrorHandlers();
-  Display *display = XOpenDisplay(NULL);
-  Window window, parent = owner ? (Window)owner : 
-    (Window)window_from_wid(wid_from_top());
-
-  string wid = wid_from_top();
-  process_t pid = pid_from_wid(wid);
-  while (WaitForChildPidOfPidToExist(pid, pid_from_self()) && 
-    name_from_pid(pid) != "zenity" && name_from_pid(pid) != "kdialog") {
-    wid = wid_from_top();
-    pid = pid_from_wid(wid);
+pid_t modify_dialog(pid_t ppid) {
+  pid_t pid = 0;
+  if ((pid = fork()) == 0) {
+    SetErrorHandlers();
+    Display *display = XOpenDisplay(NULL);
+    Window window, parent = owner ? (Window)owner : 
+      (Window)window_from_wid(wid_from_top());
+    string wid = wid_from_top();
+    process_t pid = pid_from_wid(wid);
+    while (WaitForChildPidOfPidToExist(pid, ppid) && 
+      name_from_pid(pid) != "zenity" && name_from_pid(pid) != "kdialog") {
+      wid = wid_from_top();
+      pid = pid_from_wid(wid);
+    }
+    wid_set_pwid(wid, wid_from_window((unsigned long)parent));
+    window = (Window)window_from_wid(wid);
+    Atom atom_name = XInternAtom(display,"_NET_WM_NAME", True);
+    Atom atom_utf_type = XInternAtom(display,"UTF8_STRING", True);
+    char *cstr_caption = (char *)caption.c_str();
+    XChangeProperty(display, window, atom_name, atom_utf_type, 8, 
+      PropModeReplace, (unsigned char *)cstr_caption, strlen(cstr_caption));
+    if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
+      XSetIcon(display, window, current_icon.c_str());
+    XCloseDisplay(display);
+    exit(0);
   }
-  wid_set_pwid(wid, wid_from_window((unsigned long)parent));
-  window = (Window)window_from_wid(wid);
-
-  Atom atom_name = XInternAtom(display,"_NET_WM_NAME", True);
-  Atom atom_utf_type = XInternAtom(display,"UTF8_STRING", True);
-  char *cstr_caption = (char *)caption.c_str();
-  XChangeProperty(display, window, atom_name, atom_utf_type, 8, 
-    PropModeReplace, (unsigned char *)cstr_caption, strlen(cstr_caption));
-  
-  if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
-    XSetIcon(display, window, current_icon.c_str());
-  XCloseDisplay(display);
+  return pid;
 }
 
 string shellscript_evaluate(string command) {
   char *buffer = NULL;
   size_t buffer_size = 0;
   string str_buffer;
-  
   FILE *file = popen(command.c_str(), "r");
-  modify_dialog();
-  
+  pid_t ppid = getpid();
+  pid_t pid = modify_dialog(ppid);
   while (getline(&buffer, &buffer_size, file) != -1)
     str_buffer += buffer;
-
   free(buffer);
   pclose(file);
-
+  kill(pid, SIGTERM);
+  bool died = false;
+  for (unsigned i = 0; !died && i < 4; i++) {
+    int status; 
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    if (waitpid(pid, &status, WNOHANG) == pid) died = true;
+  }
+  if (!died) kill(pid, SIGKILL);
   if (str_buffer[str_buffer.length() - 1] == '\n')
     str_buffer.pop_back();
-
   return str_buffer;
 }
 
