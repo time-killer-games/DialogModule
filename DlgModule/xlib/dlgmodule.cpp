@@ -39,10 +39,12 @@
 #include "../dlgmodule.h"
 #include "lodepng/lodepng.h"
 
+#include <sys/types.h>
 #if defined(__linux__)
 #include <proc/readproc.h>
 #elif defined(__FreeBSD__)
 #include <sys/sysctl.h>
+#include <sys/user.h>
 #include <libutil.h>
 #endif
 
@@ -50,7 +52,6 @@
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <libgen.h>
@@ -264,7 +265,7 @@ string path_from_pid(process_t pid) {
   mib[0] = CTL_KERN;
   mib[1] = KERN_PROC;
   mib[2] = KERN_PROC_PATHNAME;
-  mib[3] = procId;
+  mib[3] = pid;
   if (sysctl(mib, 4, nullptr, &s, nullptr, 0) == 0) {
     string str; str.resize(s, '\0');
     char *exe = str.data();
