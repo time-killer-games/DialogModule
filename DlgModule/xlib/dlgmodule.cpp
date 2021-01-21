@@ -37,32 +37,33 @@
 #include <algorithm>
 
 #include "../dlgmodule.h"
-#include "ProcInfo/procinfo.h"
-#include "ProcInfo/helpers.h"
 #include "lodepng/lodepng.h"
+
+#if defined(__linux__)
+#include <proc/readproc.h>
+#elif defined(__FreeBSD__)
+#include <sys/sysctl.h>
+#include <libutil.h>
+#endif
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <libgen.h>
 #include <unistd.h>
 #include <signal.h>
 
-using ::procinfo::name_from_pid;
-using ::procinfo::cmd_from_pid;
-using ::procinfo::pid_from_self;
-using ::procinfo::wid_from_window;
-using ::procinfo::window_from_wid;
-using ::procinfo::ppid_from_pid;
-using ::procinfo::pid_from_wid;
-using ::procinfo::wid_from_top;
-using ::procinfo::wid_set_pwid;
-
 using std::string;
+using std::to_string;
 using std::vector;
+
+typedef pid_t process_t;
+typedef std::string wid_t;
+typedef unsigned long long window_t;
 
 namespace dialog_module {
 
@@ -74,7 +75,7 @@ int const dm_kdialog =  1;
 int dm_dialogengine  = -1;
 
 process_t proc = 0;
-void *owner = NULL;
+void *owner = nullptr;
 string caption;
 string current_icon;
 
@@ -104,8 +105,8 @@ unsigned dialog_height = 0;
 
 void change_relative_to_kwin() {
   if (dm_dialogengine == dm_x11) {
-    Display *display = XOpenDisplay(NULL);
-    Atom aKWinRunning = XInternAtom(display, "KWIN_RUNNING", True);
+    Display *display = XOpenDisplay(nullptr);
+    Atom aKWinRunning = XInternAtom(display, "KWIN_RUNNING", true);
     bool bKWinRunning = (aKWinRunning != None);
     if (bKWinRunning) dm_dialogengine = dm_kdialog;
     else dm_dialogengine = dm_zenity;
@@ -123,8 +124,8 @@ unsigned nlpo2dc(unsigned x) {
 }
 
 void XSetIcon(Display *display, Window window, const char *icon) {
-  XSynchronize(display, True);
-  Atom property = XInternAtom(display, "_NET_WM_ICON", True);
+  XSynchronize(display, true);
+  Atom property = XInternAtom(display, "_NET_WM_ICON", true);
 
   unsigned char *data = nullptr;
   unsigned pngwidth, pngheight;
@@ -164,6 +165,24 @@ void XSetIcon(Display *display, Window window, const char *icon) {
   delete[] data;
 }
 
+string string_replace_all(string str, string substr, string nstr) {
+  size_t pos = 0;
+  while ((pos = str.find(substr, pos)) != string::npos) {
+    str.replace(pos, substr.length(), nstr);
+    pos += nstr.length();
+  }
+  return str;
+}
+
+vector<string> string_split(string str, char delimiter) {
+  vector<string> vec;
+  std::stringstream sstr(str);
+  string tmp;
+  while (std::getline(sstr, tmp, delimiter))
+    vec.push_back(tmp);
+  return vec;
+}
+
 bool file_exists(string fname) {
   struct stat sb;
   return (stat(fname.c_str(), &sb) == 0 &&
@@ -171,10 +190,9 @@ bool file_exists(string fname) {
 }
 
 string filename_absolute(string fname) {
-  char *result = realpath(fname.c_str(), NULL);
-  if (result != NULL) {
+  char result[PATH_MAX];
+  if (realpath(fname.c_str(), result)) {
     if (file_exists(result)) {
-      free(result);
       return result;
     }
   }
@@ -194,17 +212,140 @@ string filename_ext(string fname) {
   return fname.substr(fp);
 }
 
-static inline int XErrorHandlerImpl(Display *display, XErrorEvent *event) {
+int XErrorHandlerImpl(Display *display, XErrorEvent *event) {
   return 0;
 }
 
-static inline int XIOErrorHandlerImpl(Display *display) {
+int XIOErrorHandlerImpl(Display *display) {
   return 0;
 }
 
-static inline void SetErrorHandlers() {
+void SetErrorHandlers() {
   XSetErrorHandler(XErrorHandlerImpl);
   XSetIOErrorHandler(XIOErrorHandlerImpl);
+}
+
+window_t window_from_wid(wid_t wid) {
+  return stoull(wid, nullptr, 10);
+}
+
+wid_t wid_from_window(window_t window) {
+  return to_string(reinterpret_cast<unsigned long long>(window));
+}
+
+process_t ppid_from_pid(process_t pid) {
+  process_t ppid;
+  #if defined(__linux__)
+  PROCTAB *proc = openproc(PROC_FILLSTATUS | PROC_PID, &pid);
+  if (proc_t *proc_info = readproc(proc, nullptr)) { 
+    ppid = proc_info->ppid;
+    freeproc(proc_info);
+  }
+  closeproc(proc);
+  #elif defined(__FreeBSD__)
+  if (kinfo_proc *proc_info = kinfo_getproc(pid)) {
+    ppid = proc_info->ki_ppid;
+    free(proc_info);
+  }
+  #endif
+  return ppid;
+}
+
+string path_from_pid(process_t pid) {
+  if (kill(pid, 0) != 0) return "";
+  #if defined(__linux__)
+  char exe[PATH_MAX]; 
+  string symLink = string("/proc/") + to_string(pid) + string("/exe");
+  if (realpath(symLink.c_str(), exe)) {
+    return exe;
+  }
+  #elif defined(__FreeBSD__)
+  int mib[4]; size_t s;
+  mib[0] = CTL_KERN;
+  mib[1] = KERN_PROC;
+  mib[2] = KERN_PROC_PATHNAME;
+  mib[3] = procId;
+  if (sysctl(mib, 4, nullptr, &s, nullptr, 0) == 0) {
+    string str; str.resize(s, '\0');
+    char *exe = str.data();
+    if (sysctl(mib, 4, exe, &s, nullptr, 0) == 0) {
+      return exe;
+    }
+  }
+  #endif
+  return "";
+}
+
+string name_from_pid(process_t pid) {
+  string fname = path_from_pid(pid);
+  size_t fp = fname.find_last_of("/");
+  return fname.substr(fp + 1);
+}
+
+wid_t wid_from_top() {
+  SetErrorHandlers();
+  unsigned char *prop;
+  unsigned long property;
+  Atom actual_type, filter_atom;
+  int actual_format, status;
+  unsigned long nitems, bytes_after;
+  wid_t wid; Window window;
+  Display *display = XOpenDisplay(nullptr);
+  int screen = XDefaultScreen(display);
+  window = RootWindow(display, screen);
+  filter_atom = XInternAtom(display, "_NET_ACTIVE_WINDOW", true);
+  status = XGetWindowProperty(display, window, filter_atom, 0, 1000, false,
+  AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+  if (status == Success && prop != nullptr) {
+    property = prop[0] + (prop[1] << 8) + (prop[2] << 16) + (prop[3] << 24);
+    XFree(prop);
+  }
+  wid = wid_from_window(property);
+  XCloseDisplay(display);
+  return wid;
+}
+
+pid_t pid_from_wid(wid_t wid) {
+  SetErrorHandlers();
+  unsigned char *prop;
+  unsigned long property;
+  Atom actual_type, filter_atom;
+  int actual_format, status;
+  unsigned long nitems, bytes_after;
+  process_t pid; Window window;
+  window = window_from_wid(wid);
+  if (!window) return pid;
+  Display *display = XOpenDisplay(nullptr);
+  int screen = XDefaultScreen(display);
+  window = RootWindow(display, screen);
+  filter_atom = XInternAtom(display, "_NET_WM_PID", true);
+  status = XGetWindowProperty(display, window, filter_atom, 0, 1000, false,
+  AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+  if (status == Success && prop != nullptr) {
+    property = prop[0] + (prop[1] << 8) + (prop[2] << 16) + (prop[3] << 24);
+    XFree(prop);
+  }
+  pid = property;
+  XCloseDisplay(display);
+  return pid;
+}
+
+void wid_to_top(wid_t wid) {
+  SetErrorHandlers();
+  unsigned long window = window_from_wid(wid);
+  Display *display = XOpenDisplay(nullptr);
+  XRaiseWindow(display, window);
+  XSetInputFocus(display, window, RevertToPointerRoot, CurrentTime);
+  XCloseDisplay(display);
+}
+
+void wid_set_pwid(wid_t wid, wid_t pwid) {
+  SetErrorHandlers();
+  Display *display = XOpenDisplay(nullptr);
+  unsigned long window = window_from_wid(wid);
+  unsigned long parent = stoul(pwid, nullptr, 10);
+  XSetTransientForHint(display, window, parent);
+  XCloseDisplay(display);
 }
 
 bool WaitForChildPidOfPidToExist(pid_t pid, pid_t ppid) {
@@ -220,7 +361,7 @@ pid_t modify_dialog(pid_t ppid) {
   pid_t pid = 0;
   if ((pid = fork()) == 0) {
     SetErrorHandlers();
-    Display *display = XOpenDisplay(NULL);
+    Display *display = XOpenDisplay(nullptr);
     Window window, parent = owner ? (Window)owner : 
       (Window)window_from_wid(wid_from_top());
     string wid = wid_from_top();
@@ -232,8 +373,8 @@ pid_t modify_dialog(pid_t ppid) {
     }
     wid_set_pwid(wid, wid_from_window((unsigned long)parent));
     window = (Window)window_from_wid(wid);
-    Atom atom_name = XInternAtom(display,"_NET_WM_NAME", True);
-    Atom atom_utf_type = XInternAtom(display,"UTF8_STRING", True);
+    Atom atom_name = XInternAtom(display,"_NET_WM_NAME", true);
+    Atom atom_utf_type = XInternAtom(display,"UTF8_STRING", true);
     char *cstr_caption = (char *)caption.c_str();
     XChangeProperty(display, window, atom_name, atom_utf_type, 8, 
       PropModeReplace, (unsigned char *)cstr_caption, strlen(cstr_caption));
@@ -246,7 +387,7 @@ pid_t modify_dialog(pid_t ppid) {
 }
 
 string shellscript_evaluate(string command) {
-  char *buffer = NULL;
+  char *buffer = nullptr;
   size_t buffer_size = 0;
   string str_buffer;
   FILE *file = popen(command.c_str(), "r");
@@ -388,7 +529,7 @@ int show_message_helperfunc(char *str) {
 
   string str_result = shellscript_evaluate(str_command);
   caption = caption_previous;
-  double result = strtod(str_result.c_str(), NULL);
+  double result = strtod(str_result.c_str(), nullptr);
   return (int)result;
 }
 
@@ -426,7 +567,7 @@ int show_question_helperfunc(char *str) {
 
   string str_result = shellscript_evaluate(str_command);
   caption = caption_previous;
-  double result = strtod(str_result.c_str(), NULL);
+  double result = strtod(str_result.c_str(), nullptr);
   return (int)result;
 }
 
@@ -479,7 +620,7 @@ int show_attempt(char *str) {
 
   string str_result = shellscript_evaluate(str_command);
   caption = caption_previous;
-  double result = strtod(str_result.c_str(), NULL);
+  double result = strtod(str_result.c_str(), nullptr);
   return (int)result;
 }
 
@@ -531,7 +672,7 @@ int show_error(char *str, bool abort) {
 
   string str_result = shellscript_evaluate(str_command);
   caption = caption_previous;
-  double result = strtod(str_result.c_str(), NULL);
+  double result = strtod(str_result.c_str(), nullptr);
   if (result == 1) exit(0);
   return (int)result;
 }
@@ -609,7 +750,7 @@ double get_integer(char *str, double def) {
 
   string str_def = remove_trailing_zeros(def);
   string str_result = get_string(str, (char *)str_def.c_str());
-  double result = strtod(str_result.c_str(), NULL);
+  double result = strtod(str_result.c_str(), nullptr);
 
   if (result < DIGITS_MIN) result = DIGITS_MIN;
   if (result > DIGITS_MAX) result = DIGITS_MAX;
@@ -625,7 +766,7 @@ double get_passcode(char *str, double def) {
 
   string str_def = remove_trailing_zeros(def);
   string str_result = get_password(str, (char *)str_def.c_str());
-  double result = strtod(str_result.c_str(), NULL);
+  double result = strtod(str_result.c_str(), nullptr);
 
   if (result < DIGITS_MIN) result = DIGITS_MIN;
   if (result > DIGITS_MAX) result = DIGITS_MAX;
@@ -856,7 +997,7 @@ int get_color_ext(int defcol, char *title) {
 
     str_result = shellscript_evaluate(str_command);
     caption = caption_previous;
-    if (str_result == "-1") return strtod(str_result.c_str(), NULL);
+    if (str_result == "-1") return strtod(str_result.c_str(), nullptr);
     str_result = string_replace_all(str_result, "rgba(", "");
     str_result = string_replace_all(str_result, "rgb(", "");
     str_result = string_replace_all(str_result, ")", "");
@@ -864,9 +1005,9 @@ int get_color_ext(int defcol, char *title) {
 
     unsigned int index = 0;
     for (const string &str : stringVec) {
-      if (index == 0) red = strtod(str.c_str(), NULL);
-      if (index == 1) green = strtod(str.c_str(), NULL);
-      if (index == 2) blue = strtod(str.c_str(), NULL);
+      if (index == 0) red = strtod(str.c_str(), nullptr);
+      if (index == 1) green = strtod(str.c_str(), nullptr);
+      if (index == 2) blue = strtod(str.c_str(), nullptr);
       index += 1;
     }
 
@@ -884,7 +1025,7 @@ int get_color_ext(int defcol, char *title) {
 
     str_result = shellscript_evaluate(str_command);
     caption = caption_previous;
-    if (str_result == "-1") return strtod(str_result.c_str(), NULL);
+    if (str_result == "-1") return strtod(str_result.c_str(), nullptr);
     str_result = str_result.substr(1, str_result.length() - 1);
 
     unsigned int color;
