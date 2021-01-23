@@ -317,8 +317,6 @@ pid_t pid_from_wid(wid_t wid) {
   window = window_from_wid(wid);
   if (!window) return pid;
   Display *display = XOpenDisplay(nullptr);
-  int screen = XDefaultScreen(display);
-  window = RootWindow(display, screen);
   filter_atom = XInternAtom(display, "_NET_WM_PID", true);
   status = XGetWindowProperty(display, window, filter_atom, 0, 1000, false,
   AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
