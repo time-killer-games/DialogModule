@@ -1,6 +1,6 @@
 // code from: https://codereview.stackexchange.com/questions/127819/ini-file-parser-in-c
 
-#include "config.hpp"
+#include "config.h"
 #include <iostream>
 #include <fstream>
 #include <string>
