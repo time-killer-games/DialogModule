@@ -1,7 +1,7 @@
 // code from: https://codereview.stackexchange.com/questions/127819/ini-file-parser-in-c
 
-#ifndef CONFIG_HPP_
-#define CONFIG_HPP_
+#ifndef CONFIG_H_
+#define CONFIG_H_
 
 #include <string>
 #include <unordered_map>
@@ -27,4 +27,4 @@ private:
   std::list<section> sections;
 };
 
-#endif // CONFIG_HPP_
+#endif // CONFIG_H_
