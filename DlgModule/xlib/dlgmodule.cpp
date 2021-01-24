@@ -40,7 +40,10 @@
 #include "lodepng/lodepng.h"
 
 #include <sys/types.h>
-#if defined(__linux__)
+#if defined (__APPLE__) && defined(__MACH__)
+#include <sys/sysctl.h>
+#include <libproc.h>
+#elif defined(__linux__)
 #include <proc/readproc.h>
 #elif defined(__FreeBSD__)
 #include <sys/sysctl.h>
