@@ -239,9 +239,14 @@ wid_t wid_from_window(window_t window) {
 
 process_t ppid_from_pid(process_t pid) {
   process_t ppid;
-  #if defined(__linux__)
+  #if defined (__APPLE__) && defined(__MACH__)
+  proc_bsdinfo proc_info;
+  if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
+    ppid = proc_info.pbi_ppid;
+  }
+  #elif defined(__linux__)
   PROCTAB *proc = openproc(PROC_FILLSTATUS | PROC_PID, &pid);
-  if (proc_t *proc_info = readproc(proc, nullptr)) { 
+  if (proc_t *proc_info = readproc(proc, nullptr)) {
     ppid = proc_info->ppid;
     freeproc(proc_info);
   }
@@ -257,8 +262,13 @@ process_t ppid_from_pid(process_t pid) {
 
 string path_from_pid(process_t pid) {
   if (kill(pid, 0) != 0) return "";
-  #if defined(__linux__)
-  char exe[PATH_MAX]; 
+  #if defined (__APPLE__) && defined(__MACH__)
+  char exe[PROC_PIDPATHINFO_MAXSIZE];
+  if (proc_pidpath(pid, exe, sizeof(exe)) > 0) {
+    return exe;
+  }
+  #elif defined(__linux__)
+  char exe[PATH_MAX];
   string symLink = string("/proc/") + to_string(pid) + string("/exe");
   if (realpath(symLink.c_str(), exe)) {
     return exe;
