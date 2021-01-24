@@ -26,7 +26,7 @@
 
 #include "../dlgmodule.h"
 #include "widgetbuttons.h"
-#include "config/config.hpp"
+#include "config/config.h"
 #include <sys/stat.h>
 #include <climits>
 #include <cstdlib>
