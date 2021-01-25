@@ -1,10 +1,8 @@
-![](logo.png)
-
 ----------------------------------------------------------------------------------------------------------------------------------
 
 # Dialog Module - The World's Simplest Way to Dialog
 
-A simple, easy-to-use, cross-platform, dialog API, inspired by the GameMaker Language dialog functions. You may dynamically link your projects to the pre-built binaries, or simply include the proper platform-specific headers.
+A simple, easy-to-use, cross-platform, dialog API, inspired by the GameMaker Language dialog functions. You may dynamically link your projects to the pre-built binaries, or simply include the "dlgmodule.h" header.
 
 ----------------------------------------------------------------------------------------------------------------------------------
 
