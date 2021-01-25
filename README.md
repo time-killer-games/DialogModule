@@ -22,7 +22,9 @@ RedHat-based Linux distributions: sudo yum install zenity
 
 Arch-based Linux distributions: sudo pacman -Sy zenity
 
-FreeBSD-based BSD distributions: sudo pkg ins zenity
+FreeBSD-based BSD distributions: sudo pkg install zenity
+
+PureDarwin-based BSD distributions: sudo port install zenity
 
 ----------------------------------------------------------------------------------------------------------------------------------
 
@@ -34,7 +36,9 @@ RedHat-based Linux distributions: sudo yum install kdialog
 
 Arch-based Linux distributions: sudo pacman -Sy kdialog
 
-FreeBSD-based BSD distributions: sudo pkg ins kdialog
+FreeBSD-based BSD distributions: sudo pkg install kdialog
+
+PureDarwin-based BSD distributions: sudo port install kdialog
 
 ----------------------------------------------------------------------------------------------------------------------------------
 
