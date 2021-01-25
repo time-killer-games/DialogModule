@@ -14,7 +14,7 @@ https://github.com/time-killer-games/dlgmod
 
 ----------------------------------------------------------------------------------------------------------------------------------
 
-# Linux/FreeBSD Dependency Option 1: GTK (Zenity)
+# Dependency Option 1: GTK (Zenity)
 
 Debian-based Linux distributions: sudo apt-get install zenity
 
@@ -26,7 +26,7 @@ FreeBSD-based BSD distributions: sudo pkg ins zenity
 
 ----------------------------------------------------------------------------------------------------------------------------------
 
-# Linux/FreeBSD Dependency Option 2: Qt (KDialog)
+# Dependency Option 2: Qt (KDialog)
 
 Debian-based Linux distributions: sudo apt-get install kdialog
 
