@@ -37,7 +37,9 @@
 #include <algorithm>
 
 #include "../dlgmodule.h"
+#if defined(X_PROTOCOL)
 #include "lodepng/lodepng.h"
+#endif
 
 #include <sys/types.h>
 #if defined (__APPLE__) && defined(__MACH__)
@@ -51,9 +53,11 @@
 #include <libutil.h>
 #endif
 
+#if defined(X_PROTOCOL)
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+#endif
 
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -72,6 +76,14 @@ typedef unsigned long long window_t;
 namespace dialog_module {
 
 namespace {
+
+#if defined (__APPLE__) && defined(__MACH__) && !defined(X_PROTOCOL)
+extern "C" unsigned long long quartz_window_from_wid(unsigned long wid);
+extern "C" unsigned long quartz_wid_from_window(unsigned long long window);
+extern "C" unsigned long quartz_wid_from_top();
+extern "C" pid_t quartz_pid_from_wid(unsigned long wid);
+extern "C" void quartz_wid_set_pwid(unsigned long wid, unsigned long pwid);
+#endif
 
 int const dm_x11     = -1;
 int const dm_zenity  =  0;
@@ -108,6 +120,7 @@ unsigned dialog_width  = 0;
 unsigned dialog_height = 0;
 
 void change_relative_to_kwin() {
+  #if defined(X_PROTOCOL)
   if (dm_dialogengine == dm_x11) {
     Display *display = XOpenDisplay(nullptr);
     Atom aKWinRunning = XInternAtom(display, "KWIN_RUNNING", true);
@@ -116,6 +129,7 @@ void change_relative_to_kwin() {
     else dm_dialogengine = dm_zenity;
     XCloseDisplay(display);
   }
+  #endif
 }
 
 unsigned nlpo2dc(unsigned x) {
@@ -127,6 +141,7 @@ unsigned nlpo2dc(unsigned x) {
   return x | (x >> 16);
 }
 
+#if defined(X_PROTOCOL)
 void XSetIcon(Display *display, Window window, const char *icon) {
   XSynchronize(display, true);
   Atom property = XInternAtom(display, "_NET_WM_ICON", true);
@@ -168,6 +183,7 @@ void XSetIcon(Display *display, Window window, const char *icon) {
   delete[] bitmap;
   delete[] data;
 }
+#endif
 
 string string_replace_all(string str, string substr, string nstr) {
   size_t pos = 0;
@@ -216,6 +232,7 @@ string filename_ext(string fname) {
   return fname.substr(fp);
 }
 
+#if defined(X_PROTOCOL)
 int XErrorHandlerImpl(Display *display, XErrorEvent *event) {
   return 0;
 }
@@ -228,13 +245,22 @@ void SetErrorHandlers() {
   XSetErrorHandler(XErrorHandlerImpl);
   XSetIOErrorHandler(XIOErrorHandlerImpl);
 }
+#endif
 
 window_t window_from_wid(wid_t wid) {
+  #if defined(X_PROTOCOL)
   return stoull(wid, nullptr, 10);
+  #elif defined (__APPLE__) && defined(__MACH__)
+  return quartz_window_from_wid(strtoul(wid.c_str(), nullptr, 10));
+  #endif
 }
 
 wid_t wid_from_window(window_t window) {
+  #if defined(X_PROTOCOL)
   return to_string(reinterpret_cast<unsigned long long>(window));
+  #elif defined (__APPLE__) && defined(__MACH__)
+  return to_string(quartz_wid_from_window(window));
+  #endif
 }
 
 process_t ppid_from_pid(process_t pid) {
@@ -297,6 +323,7 @@ string name_from_pid(process_t pid) {
 }
 
 wid_t wid_from_top() {
+  #if defined(X_PROTOCOL)
   SetErrorHandlers();
   unsigned char *prop;
   unsigned long property;
@@ -317,9 +344,13 @@ wid_t wid_from_top() {
   wid = wid_from_window(property);
   XCloseDisplay(display);
   return wid;
+  #elif defined (__APPLE__) && defined(__MACH__)
+  return std::to_string(quartz_wid_from_top());
+  #endif
 }
 
 process_t pid_from_wid(wid_t wid) {
+  #if defined(X_PROTOCOL)
   SetErrorHandlers();
   unsigned char *prop;
   unsigned long property;
@@ -340,24 +371,22 @@ process_t pid_from_wid(wid_t wid) {
   pid = property;
   XCloseDisplay(display);
   return pid;
-}
-
-void wid_to_top(wid_t wid) {
-  SetErrorHandlers();
-  unsigned long window = window_from_wid(wid);
-  Display *display = XOpenDisplay(nullptr);
-  XRaiseWindow(display, window);
-  XSetInputFocus(display, window, RevertToPointerRoot, CurrentTime);
-  XCloseDisplay(display);
+  #elif defined (__APPLE__) && defined(__MACH__)
+  return quartz_pid_from_wid(strtoul(wid.c_str(), nullptr, 10));
+  #endif
 }
 
 void wid_set_pwid(wid_t wid, wid_t pwid) {
+  #if defined(X_PROTOCOL)
   SetErrorHandlers();
   Display *display = XOpenDisplay(nullptr);
   unsigned long window = window_from_wid(wid);
   unsigned long parent = stoul(pwid, nullptr, 10);
   XSetTransientForHint(display, window, parent);
   XCloseDisplay(display);
+  #elif defined (__APPLE__) && defined(__MACH__)
+  quartz_wid_set_pwid(strtoul(wid.c_str(), nullptr, 10), strtoul(pwid.c_str(), nullptr, 10));
+  #endif
 }
 
 bool WaitForChildPidOfPidToExist(process_t pid, process_t ppid) {
@@ -372,10 +401,16 @@ bool WaitForChildPidOfPidToExist(process_t pid, process_t ppid) {
 process_t modify_dialog(process_t ppid) {
   process_t pid = 0;
   if ((pid = fork()) == 0) {
+    #if defined(X_PROTOCOL)
     SetErrorHandlers();
     Display *display = XOpenDisplay(nullptr);
     Window window, parent = owner ? (Window)owner : 
       (Window)window_from_wid(wid_from_top());
+    #elif defined (__APPLE__) && defined(__MACH__)
+    void *window, *parent = owner ? owner : 
+      (void *)window_from_wid(wid_from_top());
+    #endif
+    #if (defined (__APPLE__) && defined(__MACH__)) || defined(X_PROTOCOL)
     string wid = wid_from_top();
     process_t pid = pid_from_wid(wid);
     while (WaitForChildPidOfPidToExist(pid, ppid) && 
@@ -384,6 +419,8 @@ process_t modify_dialog(process_t ppid) {
       pid = pid_from_wid(wid);
     }
     wid_set_pwid(wid, wid_from_window((unsigned long)parent));
+    #endif
+    #if defined(X_PROTOCOL)
     window = (Window)window_from_wid(wid);
     Atom atom_name = XInternAtom(display,"_NET_WM_NAME", true);
     Atom atom_utf_type = XInternAtom(display,"UTF8_STRING", true);
@@ -393,6 +430,7 @@ process_t modify_dialog(process_t ppid) {
     if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
       XSetIcon(display, window, current_icon.c_str());
     XCloseDisplay(display);
+    #endif
     exit(0);
   }
   return pid;
@@ -501,6 +539,7 @@ int show_message_helperfunc(char *str) {
   change_relative_to_kwin();
   string str_command;
   string str_title = message_cancel ? add_escaping(caption, true, "Question") : add_escaping(caption, true, "Information");
+  if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string caption_previous = caption;
   caption = (str_title == "Information") ? "Information" : caption;
   caption = (str_title == "Question") ? "Question" : caption;
@@ -515,11 +554,11 @@ int show_message_helperfunc(char *str) {
     str_echo = "if [ $? = 0 ] ;then echo 1;else echo -1;fi";
 
   if (dm_dialogengine == dm_zenity) {
-    string str_icon = "\" --icon-name=dialog-information);";
+    string str_icon = "\" --icon-name=\"" + add_escaping(current_icon, false, "") + "\");";
     str_cancel = string("--info --ok-label=\"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" ");
 
     if (message_cancel) {
-      str_icon = "\" --icon-name=dialog-question);";
+      str_icon = "\" --icon-name=\"" + add_escaping(current_icon, false, "") + "\");";
       str_cancel = string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" ");
     }
 
@@ -531,10 +570,10 @@ int show_message_helperfunc(char *str) {
     add_escaping(str, false, "") + str_icon + str_echo;
   }
   else if (dm_dialogengine == dm_kdialog) {
-    str_cancel = string("--msgbox \"") + add_escaping(str, false, "") + string("\" --ok-label \"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" --icon dialog-information ");
+    str_cancel = string("--msgbox \"") + add_escaping(str, false, "") + string("\" --ok-label \"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" --icon \"" + add_escaping(current_icon, false, "") + "\" ");
 
     if (message_cancel)
-      str_cancel = string("--yesno \"") + add_escaping(str, false, "") + string("\" --yes-label \"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" --icon dialog-question ");
+      str_cancel = string("--yesno \"") + add_escaping(str, false, "") + string("\" --yes-label \"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" --icon \"" + add_escaping(current_icon, false, "") + "\" ");
 
     str_command = string("kdialog ") +
     #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
@@ -553,6 +592,7 @@ int show_question_helperfunc(char *str) {
   change_relative_to_kwin();
   string str_command;
   string str_title = add_escaping(caption, true, "Question");
+  if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string caption_previous = caption;
   caption = (str_title == "Question") ? "Question" : caption;
   string str_cancel = "";
@@ -570,7 +610,7 @@ int show_question_helperfunc(char *str) {
     #endif
     string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_YES], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_NO], true, "") + string("\" ") + str_cancel +  string("--title=\"") +
     str_title + string("\" --no-wrap --text=\"") + add_escaping(str, false, "") +
-    string("\" --icon-name=dialog-question);if [ $? = 0 ] ;then echo 1;elif [ $ans = \"") + btn_array[BUTTON_CANCEL] + string("\" ] ;then echo -1;else echo 0;fi");
+    string("\" --icon-name=\"" + add_escaping(current_icon, false, "") + "\");if [ $? = 0 ] ;then echo 1;elif [ $ans = \"") + btn_array[BUTTON_CANCEL] + string("\" ] ;then echo -1;else echo 0;fi");
   }
   else if (dm_dialogengine == dm_kdialog) {
     if (question_cancel)
@@ -581,7 +621,7 @@ int show_question_helperfunc(char *str) {
     string("--attach=") + window + string(" ") +
     #endif
     string("--yesno") + str_cancel + string(" \"") + add_escaping(str, false, "") + string("\" ") +
-    string("--yes-label \"") + add_escaping(btn_array[BUTTON_YES], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_NO], true, "") + string("\" ") + string("--title \"") + str_title + string("\" --icon dialog-question;") +
+    string("--yes-label \"") + add_escaping(btn_array[BUTTON_YES], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_NO], true, "") + string("\" ") + string("--title \"") + str_title + string("\" --icon \"" + add_escaping(current_icon, false, "") + "\";") +
     string("x=$? ;if [ $x = 0 ] ;then echo 1;elif [ $x = 1 ] ;then echo 0;elif [ $x = 2 ] ;then echo -1;fi");
   }
 
@@ -617,6 +657,7 @@ int show_attempt(char *str) {
   change_relative_to_kwin();
   string str_command;
   string str_title = add_escaping(caption, true, "Error");
+  if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string caption_previous = caption;
   caption = (str_title == "Error") ? "Error" : caption;
   
@@ -630,7 +671,7 @@ int show_attempt(char *str) {
     #endif
     string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_RETRY], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" ") +  string("--title=\"") +
     str_title + string("\" --no-wrap --text=\"") + add_escaping(str, false, "") +
-    string("\" --icon-name=dialog-error --window-icon=dialog-error);if [ $? = 0 ] ;then echo 0;else echo -1;fi");
+    string("\" --icon-name=\"" + add_escaping(current_icon, false, "") + "\" --window-icon=\"" + add_escaping(current_icon, false, "") + "\");if [ $? = 0 ] ;then echo 0;else echo -1;fi");
   }
   else if (dm_dialogengine == dm_kdialog) {
     str_command = string("kdialog ") +
@@ -639,7 +680,7 @@ int show_attempt(char *str) {
     #endif
     string("--warningyesno") + string(" \"") + add_escaping(str, false, "") + string("\" ") +
     string("--yes-label \"") + add_escaping(btn_array[BUTTON_RETRY], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" ") + string("--title \"") +
-    str_title + string("\" --icon dialog-warning;") + string("x=$? ;if [ $x = 0 ] ;then echo 0;else echo -1;fi");
+    str_title + string("\" --icon \"" + add_escaping(current_icon, false, "") + "\";") + string("x=$? ;if [ $x = 0 ] ;then echo 0;else echo -1;fi");
   }
 
   string str_result = shellscript_evaluate(str_command);
@@ -652,6 +693,7 @@ int show_error(char *str, bool abort) {
   change_relative_to_kwin();
   string str_command;
   string str_title = add_escaping(caption, true, "Error");
+  if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string caption_previous = caption;
   caption = (str_title == "Error") ? "Error" : caption;
   string str_echo;
@@ -669,7 +711,7 @@ int show_error(char *str, bool abort) {
       #endif
       string("--info --ok-label=\"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" ") +
       string("--title=\"") + str_title + string("\" --no-wrap --text=\"") +
-      add_escaping(str, false, "") + string("\" --icon-name=dialog-error --window-icon=dialog-error);") + str_echo;
+      add_escaping(str, false, "") + string("\" --icon-name=\"" + add_escaping(current_icon, false, "") + "\" --window-icon=\"" + add_escaping(current_icon, false, "") + "\");") + str_echo;
     } else {
       str_command = string("ans=$(zenity ") +
       #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
@@ -677,7 +719,7 @@ int show_error(char *str, bool abort) {
       #endif
       string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_IGNORE], true, "") + string("\" ") +
       string("--title=\"") + str_title + string("\" --no-wrap --text=\"") +
-      add_escaping(str, false, "") + string("\" --icon-name=dialog-error --window-icon=dialog-error);") + str_echo;
+      add_escaping(str, false, "") + string("\" --icon-name=\"" + add_escaping(current_icon, false, "") + "\" --window-icon=\"" + add_escaping(current_icon, false, "") + "\");") + str_echo;
     }
   }
   else if (dm_dialogengine == dm_kdialog) {
@@ -690,7 +732,7 @@ int show_error(char *str, bool abort) {
       #endif
       string("--sorry \"") + add_escaping(str, false, "") + string("\" ") +
       string("--ok-label \"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" ") +
-      string("--title \"") + str_title + string("\" --icon dialog-warning;") + str_echo;
+      string("--title \"") + str_title + string("\" --icon \"" + add_escaping(current_icon, false, "") + "\";") + str_echo;
     } else {
       str_command = string("kdialog ") +
       #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
@@ -698,7 +740,7 @@ int show_error(char *str, bool abort) {
       #endif
       string("--warningyesno \"") + add_escaping(str, false, "") + string("\" ") +
       string("--yes-label \"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_IGNORE], true, "") + string("\" ") +
-      string("--title \"") + str_title + string("\" --icon dialog-warning;") + str_echo;
+      string("--title \"") + str_title + string("\" --icon \"" + add_escaping(current_icon, false, "") + "\";") + str_echo;
     }
   }
 
@@ -716,7 +758,7 @@ char *get_string(char *str, char *def) {
   string caption_previous = caption;
   caption = (str_title == "Input Query") ? "Input Query" : caption;
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
-  string str_icon = file_exists(current_icon) ? string(" --icon \"") + current_icon + string("\"") : "";
+  string str_icon = file_exists(current_icon) ? string(" --icon \"") + add_escaping(current_icon, false, "") + string("\"") : "";
 
   wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
     wid_from_window((unsigned long)owner) : wid_from_top();
@@ -728,7 +770,7 @@ char *get_string(char *str, char *def) {
     #endif
     string("--entry --title=\"") + str_title + string("\" --text=\"") +
     add_escaping(str, false, "") + string("\" --entry-text=\"") +
-    add_escaping(def, false, "") + string("\");echo $ans");
+    add_escaping(def, false, "") + string("\";echo $ans");
   }
   else if (dm_dialogengine == dm_kdialog) {
     str_command = string("ans=$(kdialog ") +
@@ -763,7 +805,7 @@ char *get_password(char *str, char *def) {
     #endif
     string("--entry --title=\"") + str_title + string("\" --text=\"") +
     add_escaping(str, false, "") + string("\" --hide-text --entry-text=\"") +
-    add_escaping(def, false, "") + string("\");echo $ans");
+    add_escaping(def, false, "") + string("\";echo $ans");
   }
   else if (dm_dialogengine == dm_kdialog) {
     str_command = string("ans=$(kdialog ") +
@@ -772,7 +814,7 @@ char *get_password(char *str, char *def) {
     #endif
     string("--password \"") + add_escaping(str, false, "") + string("\" \"") +
     add_escaping(def, false, "") + string("\" --title \"") +
-    str_title + string("\");echo $ans");
+    str_title + string("\";echo $ans");
   }
 
   static string result;
@@ -827,7 +869,7 @@ char *get_open_filename_ext(char *filter, char *fname, char *dir, char *title) {
   string str_dir = dirname(dir);
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
-  string str_icon = file_exists(current_icon) ? str_iconflag + current_icon + string("\"") : "";
+  string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
 
   wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
     wid_from_window((unsigned long)owner) : wid_from_top();
@@ -880,7 +922,7 @@ char *get_open_filenames_ext(char *filter, char *fname, char *dir, char *title) 
   string str_dir = dirname(dir);
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
-  string str_icon = file_exists(current_icon) ? str_iconflag + current_icon + string("\"") : "";
+  string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
 
   wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
     wid_from_window((unsigned long)owner) : wid_from_top();
@@ -940,7 +982,7 @@ char *get_save_filename_ext(char *filter, char *fname, char *dir, char *title) {
   string str_dir = dirname(dir);
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
-  string str_icon = file_exists(current_icon) ? str_iconflag + current_icon + string("\"") : "";
+  string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
   
   wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
     wid_from_window((unsigned long)owner) : wid_from_top();
@@ -988,7 +1030,7 @@ char *get_directory_alt(char *capt, char *root) {
   string str_dname = root;
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
-  string str_icon = file_exists(current_icon) ? str_iconflag + current_icon + string("\"") : "";
+  string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
   string str_end = ");if [ $ans = / ] ;then echo $ans;elif [ $? = 1 ] ;then echo $ans/;else echo $ans;fi";
 
   wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
@@ -1033,7 +1075,7 @@ int get_color_ext(int defcol, char *title) {
   string str_result;
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
-  string str_icon = file_exists(current_icon) ? str_iconflag + current_icon + string("\"") : "";
+  string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
 
   wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
     wid_from_window((unsigned long)owner) : wid_from_top();
