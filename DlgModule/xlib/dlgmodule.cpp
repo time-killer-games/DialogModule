@@ -524,7 +524,9 @@ int show_message_helperfunc(char *str) {
     }
 
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     str_cancel + string("--title=\"") + str_title + string("\" --no-wrap --text=\"") +
     add_escaping(str, false, "") + str_icon + str_echo;
   }
@@ -535,7 +537,9 @@ int show_message_helperfunc(char *str) {
       str_cancel = string("--yesno \"") + add_escaping(str, false, "") + string("\" --yes-label \"") + add_escaping(btn_array[BUTTON_OK], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" --icon dialog-question ");
 
     str_command = string("kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     str_cancel + string("--title \"") + str_title + string("\";") + str_echo;
   }
 
@@ -561,7 +565,9 @@ int show_question_helperfunc(char *str) {
       str_cancel = string("--extra-button=\"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" ");
 
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_YES], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_NO], true, "") + string("\" ") + str_cancel +  string("--title=\"") +
     str_title + string("\" --no-wrap --text=\"") + add_escaping(str, false, "") +
     string("\" --icon-name=dialog-question);if [ $? = 0 ] ;then echo 1;elif [ $ans = \"") + btn_array[BUTTON_CANCEL] + string("\" ] ;then echo -1;else echo 0;fi");
@@ -571,7 +577,9 @@ int show_question_helperfunc(char *str) {
       str_cancel = "cancel";
 
     str_command = string("kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--yesno") + str_cancel + string(" \"") + add_escaping(str, false, "") + string("\" ") +
     string("--yes-label \"") + add_escaping(btn_array[BUTTON_YES], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_NO], true, "") + string("\" ") + string("--title \"") + str_title + string("\" --icon dialog-question;") +
     string("x=$? ;if [ $x = 0 ] ;then echo 1;elif [ $x = 1 ] ;then echo 0;elif [ $x = 2 ] ;then echo -1;fi");
@@ -617,14 +625,18 @@ int show_attempt(char *str) {
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_RETRY], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" ") +  string("--title=\"") +
     str_title + string("\" --no-wrap --text=\"") + add_escaping(str, false, "") +
     string("\" --icon-name=dialog-error --window-icon=dialog-error);if [ $? = 0 ] ;then echo 0;else echo -1;fi");
   }
   else if (dm_dialogengine == dm_kdialog) {
     str_command = string("kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--warningyesno") + string(" \"") + add_escaping(str, false, "") + string("\" ") +
     string("--yes-label \"") + add_escaping(btn_array[BUTTON_RETRY], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_CANCEL], true, "") + string("\" ") + string("--title \"") +
     str_title + string("\" --icon dialog-warning;") + string("x=$? ;if [ $x = 0 ] ;then echo 0;else echo -1;fi");
@@ -652,13 +664,17 @@ int show_error(char *str, bool abort) {
 
     if (abort) {
       str_command = string("ans=$(zenity ") +
+      #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
       string("--attach=$(sleep .01;") + window + string(") ") +
+      #endif
       string("--info --ok-label=\"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" ") +
       string("--title=\"") + str_title + string("\" --no-wrap --text=\"") +
       add_escaping(str, false, "") + string("\" --icon-name=dialog-error --window-icon=dialog-error);") + str_echo;
     } else {
       str_command = string("ans=$(zenity ") +
+      #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
       string("--attach=$(sleep .01;") + window + string(") ") +
+      #endif
       string("--question --ok-label=\"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" --cancel-label=\"") + add_escaping(btn_array[BUTTON_IGNORE], true, "") + string("\" ") +
       string("--title=\"") + str_title + string("\" --no-wrap --text=\"") +
       add_escaping(str, false, "") + string("\" --icon-name=dialog-error --window-icon=dialog-error);") + str_echo;
@@ -669,13 +685,17 @@ int show_error(char *str, bool abort) {
 
     if (abort) {
       str_command = string("kdialog ") +
+      #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
       string("--attach=") + window + string(" ") +
+      #endif
       string("--sorry \"") + add_escaping(str, false, "") + string("\" ") +
       string("--ok-label \"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" ") +
       string("--title \"") + str_title + string("\" --icon dialog-warning;") + str_echo;
     } else {
       str_command = string("kdialog ") +
+      #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
       string("--attach=") + window + string(" ") +
+      #endif
       string("--warningyesno \"") + add_escaping(str, false, "") + string("\" ") +
       string("--yes-label \"") + add_escaping(btn_array[BUTTON_ABORT], true, "") + string("\" --no-label \"") + add_escaping(btn_array[BUTTON_IGNORE], true, "") + string("\" ") +
       string("--title \"") + str_title + string("\" --icon dialog-warning;") + str_echo;
@@ -703,14 +723,18 @@ char *get_string(char *str, char *def) {
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--entry --title=\"") + str_title + string("\" --text=\"") +
     add_escaping(str, false, "") + string("\" --entry-text=\"") +
     add_escaping(def, false, "") + string("\");echo $ans");
   }
   else if (dm_dialogengine == dm_kdialog) {
     str_command = string("ans=$(kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--inputbox \"") + add_escaping(str, false, "") + string("\" \"") +
     add_escaping(def, false, "") + string("\" --title \"") +
     str_title + string("\"") + str_icon + string(");echo $ans");
@@ -734,14 +758,18 @@ char *get_password(char *str, char *def) {
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--entry --title=\"") + str_title + string("\" --text=\"") +
     add_escaping(str, false, "") + string("\" --hide-text --entry-text=\"") +
     add_escaping(def, false, "") + string("\");echo $ans");
   }
   else if (dm_dialogengine == dm_kdialog) {
     str_command = string("ans=$(kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--password \"") + add_escaping(str, false, "") + string("\" \"") +
     add_escaping(def, false, "") + string("\" --title \"") +
     str_title + string("\");echo $ans");
@@ -810,7 +838,9 @@ char *get_open_filename_ext(char *filter, char *fname, char *dir, char *title) {
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--file-selection --title=\"") + str_title + string("\" --filename=\"") +
     add_escaping(str_fname, false, "") + string("\"") + zenity_filter(filter) + str_icon + string(");echo $ans");
   }
@@ -819,7 +849,9 @@ char *get_open_filename_ext(char *filter, char *fname, char *dir, char *title) {
       string("\"") + add_escaping(str_fname, false, "") + string("\""); else pwd = "\"$PWD/\"";
 
     str_command = string("ans=$(kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--getopenfilename ") + pwd + kdialog_filter(filter) +
     string(" --title \"") + str_title + string("\"") + str_icon + string(");echo $ans");
   }
@@ -859,7 +891,9 @@ char *get_open_filenames_ext(char *filter, char *fname, char *dir, char *title) 
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--file-selection --multiple --separator='\n' --title=\"") + str_title + string("\" --filename=\"") +
     add_escaping(str_fname, false, "") + string("\"") + zenity_filter(filter) + str_icon;
   }
@@ -868,7 +902,9 @@ char *get_open_filenames_ext(char *filter, char *fname, char *dir, char *title) 
       string("\"") + add_escaping(str_fname, false, "") + string("\""); else pwd = "\"$PWD/\"";
 
     str_command = string("kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--getopenfilename ") + pwd + kdialog_filter(filter) +
     string(" --multiple --separate-output --title \"") + str_title + string("\"") + str_icon;
   }
@@ -915,7 +951,9 @@ char *get_save_filename_ext(char *filter, char *fname, char *dir, char *title) {
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--file-selection  --save --confirm-overwrite --title=\"") + str_title + string("\" --filename=\"") +
     add_escaping(str_fname, false, "") + string("\"") + zenity_filter(filter) + str_icon + string(");echo $ans");
   }
@@ -924,7 +962,9 @@ char *get_save_filename_ext(char *filter, char *fname, char *dir, char *title) {
       string("\"") + add_escaping(str_fname, false, "") + string("\""); else pwd = "\"$PWD/\"";
 
     str_command = string("ans=$(kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--getsavefilename ") + pwd + kdialog_filter(filter) +
     string(" --title \"") + str_title + string("\"") + str_icon + string(");echo $ans");
   }
@@ -956,7 +996,9 @@ char *get_directory_alt(char *capt, char *root) {
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--file-selection --directory --title=\"") + str_title + string("\" --filename=\"") +
     add_escaping(str_dname, false, "") + string("\"") + str_icon + str_end;
   }
@@ -965,7 +1007,9 @@ char *get_directory_alt(char *capt, char *root) {
       string("\"") + add_escaping(str_dname, false, "") + string("\""); else pwd = "\"$PWD/\"";
 
     str_command = string("ans=$(kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--getexistingdirectory ") + pwd + string(" --title \"") + str_title + string("\"") + str_icon + str_end;
   }
 
@@ -1003,7 +1047,9 @@ int get_color_ext(int defcol, char *title) {
     str_defcol = string("rgb(") + std::to_string(red) + string(",") +
     std::to_string(green) + string(",") + std::to_string(blue) + string(")");
     str_command = string("ans=$(zenity ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=$(sleep .01;") + window + string(") ") +
+    #endif
     string("--color-selection --show-palette --title=\"") + str_title + string("\" --color='") +
     str_defcol + string("'") + str_icon + string(");if [ $? = 0 ] ;then echo $ans;else echo -1;fi");
 
@@ -1031,7 +1077,9 @@ int get_color_ext(int defcol, char *title) {
     std::transform(str_defcol.begin(), str_defcol.end(), str_defcol.begin(), ::toupper);
 
     str_command = string("ans=$(kdialog ") +
+    #if !defined (__APPLE__) && !defined(__MACH__) && defined(X_PROTOCOL)
     string("--attach=") + window + string(" ") +
+    #endif
     string("--getcolor --default '") + str_defcol + string("' --title \"") + str_title +
     string("\"") + str_icon + string(");if [ $? = 0 ] ;then echo $ans;else echo -1;fi");
 
