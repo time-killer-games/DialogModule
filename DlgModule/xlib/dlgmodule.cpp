@@ -43,7 +43,7 @@
 #if defined (__APPLE__) && defined(__MACH__)
 #include <sys/sysctl.h>
 #include <libproc.h>
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
 #include <proc/readproc.h>
 #elif defined(__FreeBSD__)
 #include <sys/sysctl.h>
@@ -244,7 +244,7 @@ process_t ppid_from_pid(process_t pid) {
   if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
     ppid = proc_info.pbi_ppid;
   }
-  #elif defined(__linux__)
+  #elif defined(__linux__) && !defined(__ANDROID__)
   PROCTAB *proc = openproc(PROC_FILLSTATUS | PROC_PID, &pid);
   if (proc_t *proc_info = readproc(proc, nullptr)) {
     ppid = proc_info->ppid;
@@ -267,7 +267,7 @@ string path_from_pid(process_t pid) {
   if (proc_pidpath(pid, exe, sizeof(exe)) > 0) {
     return exe;
   }
-  #elif defined(__linux__)
+  #elif defined(__linux__) && !defined(__ANDROID__)
   char exe[PATH_MAX];
   string symLink = string("/proc/") + to_string(pid) + string("/exe");
   if (realpath(symLink.c_str(), exe)) {
@@ -510,9 +510,6 @@ int show_message_helperfunc(char *str) {
 
   string str_cancel;
   string str_echo = "echo 1";
-  
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") +
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   if (message_cancel)
     str_echo = "if [ $? = 0 ] ;then echo 1;else echo -1;fi";
@@ -556,9 +553,6 @@ int show_question_helperfunc(char *str) {
   string caption_previous = caption;
   caption = (str_title == "Question") ? "Question" : caption;
   string str_cancel = "";
-
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   if (dm_dialogengine == dm_zenity) {
     if (question_cancel)
@@ -616,9 +610,6 @@ int show_attempt(char *str) {
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
   string caption_previous = caption;
   caption = (str_title == "Error") ? "Error" : caption;
-  
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
@@ -649,9 +640,6 @@ int show_error(char *str, bool abort) {
   string caption_previous = caption;
   caption = (str_title == "Error") ? "Error" : caption;
   string str_echo;
-
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   if (dm_dialogengine == dm_zenity) {
     str_echo = abort ? "echo 1" : "if [ $? = 0 ] ;then echo 1;else echo -1;fi";
@@ -701,9 +689,6 @@ char *get_string(char *str, char *def) {
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
 
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
-
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
     string("--entry --title=\"") + str_title + string("\"") + str_icon + string(" --text=\"") +
@@ -732,9 +717,6 @@ char *get_password(char *str, char *def) {
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
   string caption_previous = caption;
   caption = (str_title == "Input Query") ? "Input Query" : caption;
-
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
@@ -803,9 +785,6 @@ char *get_open_filename_ext(char *filter, char *fname, char *dir, char *title) {
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
 
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
-
   string str_path = fname;
   if (str_dir[0] != '\0') str_path = str_dir + string("/") + str_fname;
   str_fname = (char *)str_path.c_str();
@@ -849,9 +828,6 @@ char *get_open_filenames_ext(char *filter, char *fname, char *dir, char *title) 
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
-
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   string str_path = fname;
   if (str_dir[0] != '\0') str_path = str_dir + string("/") + str_fname;
@@ -903,9 +879,6 @@ char *get_save_filename_ext(char *filter, char *fname, char *dir, char *title) {
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
-  
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   string str_path = fname;
   if (str_dir[0] != '\0') str_path = str_dir + string("/") + str_fname;
@@ -947,9 +920,6 @@ char *get_directory_alt(char *capt, char *root) {
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
   string str_end = ");if [ $ans = / ] ;then echo $ans;elif [ $? = 1 ] ;then echo $ans/;else echo $ans;fi";
 
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
-
   if (dm_dialogengine == dm_zenity) {
     str_command = string("ans=$(zenity ") +
     string("--file-selection --directory --title=\"") + str_title + string("\" --filename=\"") +
@@ -984,9 +954,6 @@ int get_color_ext(int defcol, char *title) {
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
-
-  wid_t window = owner ? ((dm_dialogengine == dm_zenity) ? "echo " : "") + 
-    wid_from_window((unsigned long)owner) : wid_from_top();
 
   int red; int green; int blue;
   red = color_get_red(defcol);

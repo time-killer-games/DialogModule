@@ -1,4 +1,4 @@
-﻿/*
+/*
 
  MIT License
 
@@ -24,17 +24,7 @@
 
 */
 
-#include "../dlgmodule.h"
-
-#include <windows.h>
-#include <gdiplus.h>
-#include <shobjidl.h>
-#include <Commdlg.h>
-#include <commctrl.h>
-#include <comdef.h>
-#include <atlbase.h>
-#include <activscp.h>
-#include <Shlobj.h>
+#define _WIN32_IE 0x0900
 
 #include <cstdlib>
 #include <cstdio>
@@ -42,6 +32,20 @@
 
 #include <vector>
 #include <string>
+
+#include "../dlgmodule.h"
+
+#include <windows.h>
+#include <gdiplus.h>
+#include <shobjidl.h>
+#include <shlwapi.h>
+#include <Commdlg.h>
+#include <commctrl.h>
+#include <comdef.h>
+#include <atlbase.h>
+#include <activscp.h>
+#include <Objbase.h>
+#include <Shlobj.h>
 
 using namespace Gdiplus;
 using std::basic_string;
